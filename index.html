@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HKUGA College - 20th Anniversary Terminal</title>
+    <style>
+        /* --- CORE CONFIGURATION --- */
+        :root {
+            --bg-color: #000000;
+            --term-green: #33ff00;       /* The main phosphor green */
+            --term-dim: #1a8000;         /* Dimmer green for borders */
+            --term-glow: 0 0 10px rgba(51, 255, 0, 0.6), 0 0 2px rgba(51, 255, 0, 0.4);
+            --font-stack: "Consolas", "Monaco", "Courier New", monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--term-green);
+            font-family: var(--font-stack);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* --- CRT SCREEN CONTAINER --- */
+        .crt-monitor {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* Center content vertically */
+            align-items: center;     /* Center content horizontally */
+            
+            /* The CRT Flicker Effect */
+            animation: textFlicker 0.1s infinite;
+        }
+
+        /* --- VISUAL OVERLAYS (Scanlines & Vignette) --- */
+        .scanlines {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.3) 50%,
+                rgba(0,0,0,0.3)
+            );
+            background-size: 100% 4px; /* Size of scanlines */
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .vignette {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,1) 100%);
+            pointer-events: none;
+            z-index: 11;
+        }
+
+        /* --- TOP STATUS BAR --- */
+        .status-bar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            border-bottom: 2px solid var(--term-dim);
+            padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 14px;
+            text-shadow: var(--term-glow);
+            z-index: 5;
+        }
+
+        /* --- MAIN TERMINAL AREA --- */
+        .terminal-content {
+            z-index: 5;
+            text-align: center;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        /* The Boot Text Container */
+        #boot-log {
+            text-align: left;
+            font-size: 1.2rem;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            min-height: 50vh; /* Reserve space during boot */
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding-left: 10%; /* Center the boot text visually */
+        }
+
+        .log-msg { margin-bottom: 5px; }
+        .success { color: #fff; font-weight: bold; }
+
+        /* The ASCII Logo Container */
+        pre#ascii-art {
+            font-family: var(--font-stack);
+            font-size: 10px; /* Base size, adjusted by JS for screens */
+            line-height: 10px; /* Must match font-size for block art */
+            font-weight: bold;
+            white-space: pre;
+            text-align: center;
+            display: none; /* Hidden until boot finishes */
+            text-shadow: var(--term-glow);
+            margin: 0 auto;
+            opacity: 0;
+            transition: opacity 1s ease-in;
+        }
+
+        /* Final Prompt */
+        .prompt-line {
+            margin-top: 30px;
+            font-size: 1.5rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            opacity: 0;
+            text-shadow: var(--term-glow);
+        }
+
+        /* Blinking Cursor Block */
+        .cursor {
+            display: inline-block;
+            width: 12px;
+            height: 1.2em;
+            background-color: var(--term-green);
+            vertical-align: sub;
+            animation: blink 1s step-end infinite;
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        
+        @keyframes textFlicker {
+            0% { opacity: 0.98; }
+            5% { opacity: 0.95; }
+            10% { opacity: 0.9; }
+            15% { opacity: 0.95; }
+            20% { opacity: 1; }
+            60% { opacity: 0.95; }
+            80% { opacity: 0.98; }
+            100% { opacity: 0.99; }
+        }
+
+        /* Glitch Animation Classes (applied via JS) */
+        .glitch-active {
+            animation: glitch-anim 0.2s cubic-bezier(.25, .46, .45, .94) both infinite;
+            color: #fff; /* Flash white during glitch */
+        }
+
+        @keyframes glitch-anim {
+            0% { transform: translate(0); }
+            20% { transform: translate(-3px, 3px); }
+            40% { transform: translate(-3px, -3px); }
+            60% { transform: translate(3px, 3px); }
+            80% { transform: translate(3px, -3px); }
+            100% { transform: translate(0); }
+        }
+
+        /* Responsive Scaling for the ASCII Art */
+        @media (min-width: 1600px) { pre#ascii-art { font-size: 12px; line-height: 12px; } }
+        @media (max-width: 1200px) { pre#ascii-art { font-size: 8px; line-height: 8px; } }
+        @media (max-width: 800px) { pre#ascii-art { font-size: 5px; line-height: 5px; } }
+
+    </style>
+</head>
+<body>
+
+    <div class="crt-monitor">
+        <div class="scanlines"></div>
+        <div class="vignette"></div>
+
+        <div class="status-bar">
+            <span>HKUGA COLLEGE TERMINAL</span>
+            <span id="clock">00:00:00</span>
+            <span>STATUS: <span id="sys-status">OFFLINE</span></span>
+        </div>
+
+        <div class="terminal-content">
+            <div id="boot-log"></div>
+            
+            <pre id="ascii-art"></pre>
+
+            <div class="prompt-line" id="prompt">
+                > OPEN_DAY_MODE: <span style="color:#fff">ACTIVE</span><span class="cursor"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* --- ASCII ART GENERATION --- 
+           I have manually mapped the "2 merged with H" logo using block characters.
+           This ensures the diagonal of the 2, the serif of the H, and the crossbars
+           align exactly with the visual weight of your image.
+        */
+        const LOGO_DATA = 
+`
+                    ░▓██████████▓░                                                                              
+                ▒████████████████████▓░                                                                        
+              ▒█████▒       ░█████████████▒                                                                    
+             ▓█████▓          ▒██████████████▓                                                                 
+            ░██████░           ▒███████████████                                                                
+            ▒█████▓             ████████████▓░                                                                 
+             ▒███▓              ███████████░                              ▒▓██░                                
+                                ███████████░                        ░▓████████                                 
+                               ░███████████░                     ░████████████                                 
+                               ▓███████████░                      ░███████████                                 
+                              ▒████████████░                         ▓████████                                 
+                             ░█████████████░                         ▓████████                                 
+                            ░█████░████████░                         ▓████████                                 
+                           ▒█████ ░████████░                         ▓████████                                 
+                          ▓████░  ░████████░                         ▓████████                                 
+                        ░█████    ░████████░                         ▓████████                                 
+                       ▓████░     ░████████░                         ▓████████                                 
+                     ░█████       ░████████░                         ▓████████                                 
+                    ▓████░        ░████████░                         ▓████████                                 
+                  ▓████▒          ░████████░                         ▓████████          ▒███▒                  
+                ▓█████            ░████████░                         ▓████████         ███████░                
+              ███████             ░████████░                         ▓████████       ░██████████░              
+           ██████████▓░░░░░░░░░░░░░████████▒░░░░░░░░░░░░░░░░░░░░░░░░░▓████████░░░░░░▓█████████████             
+           ▒███████████████████████████████████████████████████████████████████████████████████████▒           
+            █▒░░░░░░░░░░░░░░░░░░░░▒████████▒░░░░░░░░░░░░░░░░░░░░░░░░░▓████████░░░░░░░░░░░░░░░░░░░░░░           
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░███████████████████████████████████████████                                 
+                                  ░█████████▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓█████████                                 
+                                  ░████████░                         ▓████████                                 
+                                  ░████████░                         █████████                                 
+                                  ░████████░                          ░▓█████▓                                 
+                                  ░████████░                                ▒░                                 
+                                  ▒███████░                                                                    
+                                  ▒███▒                                                                        
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+░   ░░░  ░░    ░░  ░░   ░░    ░▒▒░      ░░░           ▒▒░      ░▒░     ░░      ░░      ░░░░░░░    ░▒░    ░░░░░░
+█▒  ██▓  ██▓ ░██░ ░██░ ░██  ░██████░   ▓███░       ░██████░  ███████  ▓██     ░██░     ██████▓  ██████▓  ██████
+█▒  ██▓  ██▓ ██▒  ░██░ ░██  ██▓  ██▓   ██▓██       ▒██  ▒██ ░██░ ░██  ▓██     ░██░     ██▒     ░██  ▒██  ██▓   
+█▒  ██▓  ██▓██▒   ░██░ ░██  ██▓  ░░░  ░██░██░      ▒██  ░░░ ░██░ ░██░ ▓██     ░██░     ██▒     ▒██   ░░  ██▓   
+██████▓  █████    ░██░ ░██  ██▓ ███▓  ▓█▓ ██▒      ▒██      ░██░ ░██░ ▓██     ░██░     ██████  ▒██ ▒███  ██████
+█▓░░██▓  █████▓   ░██░ ░██  ██▓ ▓██▓  ██▒ ██▓      ▒██      ░██░ ░██░ ▓██     ░██░     ██▒░░░  ▒██ ░▓██  ██▓░░░
+█▒  ██▓  ██▓ ██▒  ░██░ ░██  ██▓  ██▓  ███████      ▒██  ▒██ ░██░ ░██░ ▓██     ░██░     ██▒     ▒██  ▒██  ██▓   
+█▒  ██▓  ██▓ ▒██   ██▒ ▒██  ███  ██▒ ▒██░░░██░     ▒██░ ▓██ ░██░ ▒██  ▓██     ░██░     ██▒     ░██░ ▒██  ██▓   
+█▒  ██▓  ██▓  ▓██  ▒█████░   ▓████▓  ██▒   ██▓      ▒█████   ░█████░  ▓██████ ░██████░ ███████  ▒█████░  ██████
+                                                                                                               
+`;
+
+        const BOOT_SEQUENCE = [
+            "INITIALIZING BIOS...",
+            "CHECKING SYSTEM INTEGRITY... [OK]",
+            "LOADING GRAPHICS ENGINE... [OK]",
+            "ACCESSING HKUGA_NET...",
+            "DECRYPTING LOGO_ASSETS...",
+            "RENDERING 20TH_ANNIVERSARY_MODULE...",
+            "ESTABLISHING SECURE CONNECTION...",
+            "SYSTEM READY."
+        ];
+
+        // --- DOM ELEMENTS ---
+        const bootLog = document.getElementById('boot-log');
+        const asciiContainer = document.getElementById('ascii-art');
+        const promptLine = document.getElementById('prompt');
+        const sysStatus = document.getElementById('sys-status');
+        const clockEl = document.getElementById('clock');
+
+        // --- UTILITIES ---
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        // --- CLOCK ---
+        setInterval(() => {
+            const now = new Date();
+            clockEl.textContent = now.toLocaleTimeString('en-GB');
+        }, 1000);
+
+        // --- BOOT PROCESS ---
+        async function runBoot() {
+            // 1. Type out boot messages
+            for (let line of BOOT_SEQUENCE) {
+                const p = document.createElement('div');
+                p.className = 'log-msg';
+                bootLog.appendChild(p);
+
+                // Typing effect
+                let text = line;
+                p.innerHTML = ""; 
+                for(let i=0; i<text.length; i++) {
+                    p.innerHTML += text[i];
+                    await sleep(15); // Typing speed
+                }
+                
+                // Add success color if [OK] is present
+                if(line.includes("[OK]")) {
+                    p.innerHTML = p.innerHTML.replace("[OK]", "<span class='success'>[OK]</span>");
+                }
+                
+                window.scrollTo(0, document.body.scrollHeight);
+                await sleep(200); // Pause between lines
+            }
+
+            await sleep(500);
+
+            // 2. Clear boot log and show logo
+            bootLog.style.display = 'none';
+            asciiContainer.style.display = 'block';
+            
+            // Allow the browser a frame to render the block before fading in
+            requestAnimationFrame(() => {
+                asciiContainer.style.opacity = '1';
+                renderLogo(LOGO_DATA);
+            });
+
+            sysStatus.textContent = "ONLINE";
+            sysStatus.style.color = "#fff";
+            
+            await sleep(1000);
+            promptLine.style.opacity = '1';
+
+            // 3. Start Glitch Loop
+            startGlitchLoop();
+        }
+
+        // --- RENDER LOGO ---
+        function renderLogo(art) {
+            asciiContainer.textContent = art;
+            asciiContainer.dataset.original = art; // Store for glitch restoration
+        }
+
+        // --- GLITCH EFFECT ---
+        function startGlitchLoop() {
+            // Random glitch every 2-5 seconds
+            const nextGlitch = Math.random() * 3000 + 2000;
+            
+            setTimeout(() => {
+                triggerGlitch();
+                startGlitchLoop();
+            }, nextGlitch);
+        }
+
+        function triggerGlitch() {
+            const original = asciiContainer.dataset.original;
+            const lines = original.split('\n');
+            const glitchChars = "█▓▒░@#$+=*";
+            
+            // Create corrupted version
+            let corrupted = lines.map(line => {
+                if (Math.random() > 0.8) { // Only affect 20% of lines
+                    let chars = line.split('');
+                    // Replace random chunks
+                    for(let i=0; i<chars.length; i++) {
+                        if(chars[i] !== ' ' && Math.random() > 0.7) {
+                            chars[i] = glitchChars[Math.floor(Math.random() * glitchChars.length)];
+                        }
+                    }
+                    // Occasionally shift line
+                    if(Math.random() > 0.5) return " " + chars.join(''); 
+                    return chars.join('');
+                }
+                return line;
+            }).join('\n');
+
+            // Apply visual shake + corrupted text
+            asciiContainer.textContent = corrupted;
+            asciiContainer.classList.add('glitch-active');
+
+            // Restore after 150ms
+            setTimeout(() => {
+                asciiContainer.textContent = original;
+                asciiContainer.classList.remove('glitch-active');
+            }, 150);
+        }
+
+        // Start
+        window.onload = runBoot;
+
+    </script>
+</body>
+</html>
